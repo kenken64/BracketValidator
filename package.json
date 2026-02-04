@@ -1,0 +1,20 @@
+{
+  "name": "bracketvalidator",
+  "version": "1.0.0",
+  "description": "A terminal app that validates balanced brackets",
+  "main": "index.js",
+  "bin": {
+    "bracket-validator": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "mocha solution.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "mocha": "^11.7.5"
+  }
+}
