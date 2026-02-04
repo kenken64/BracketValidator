@@ -103,27 +103,227 @@ This solution guide provides the expected answers for all test cases in the eval
 
 ## Algorithm Solution
 
-### Core Logic
+### Why Use a Stack?
+
+A **stack** is the perfect data structure for this problem because brackets follow the **Last-In-First-Out (LIFO)** principle. Think of it like stacking plates:
+- The last plate you put on top is the first one you take off
+- Similarly, the last opening bracket must be closed first
+
+```
+Example: ( [ { } ] )
+
+When we see '(':  Stack = ['(']
+When we see '[':  Stack = ['(', '[']
+When we see '{':  Stack = ['(', '[', '{']
+When we see '}':  Stack = ['(', '[']      ← '{' was last in, first out
+When we see ']':  Stack = ['(']           ← '[' matches
+When we see ')':  Stack = []              ← '(' matches
+Final: Stack is empty = VALID!
+```
+
+---
+
+### Code Walkthrough
+
+#### Step 1: Initialize Data Structures
+
+```javascript
+const stack = [];
+const openingBrackets = '([{';
+const closingBrackets = ')]}';
+const bracketPairs = {
+    ')': '(',
+    ']': '[',
+    '}': '{'
+};
+```
+
+**Explanation:**
+- `stack` - An empty array that will store opening brackets as we find them
+- `openingBrackets` - A string containing all opening bracket characters for easy lookup
+- `closingBrackets` - A string containing all closing bracket characters
+- `bracketPairs` - A mapping object that tells us which opening bracket matches each closing bracket
+
+**Why use an object for bracketPairs?**
+Objects in JavaScript provide O(1) lookup time. When we see `)`, we can instantly find that it should match `(` without searching through an array.
+
+---
+
+#### Step 2: Iterate Through Each Character
+
+```javascript
+for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+```
+
+**Explanation:**
+- We use a traditional `for` loop instead of `forEach` because we need the index `i`
+- The index is important for reporting WHERE an error occurred
+- `char` holds the current character we're examining
+
+---
+
+#### Step 3: Handle Opening Brackets
+
+```javascript
+if (openingBrackets.includes(char)) {
+    stack.push({ bracket: char, position: i });
+}
+```
+
+**Explanation:**
+- `includes()` checks if `char` is one of `(`, `[`, or `{`
+- If it is, we push an object onto the stack containing:
+  - `bracket`: The actual bracket character
+  - `position`: Where it was found (for error reporting)
+
+**Visual Example:** Input = `"a]b"`
+```
+i=0, char='(': openingBrackets.includes('(') = true
+              Stack becomes: [{ bracket: '(', position: 0 }]
+
+i=1, char='[': openingBrackets.includes('[') = true
+              Stack becomes: [{ bracket: '(', position: 0 },
+                             { bracket: '[', position: 1 }]
+```
+
+---
+
+#### Step 4: Handle Closing Brackets
+
+```javascript
+else if (closingBrackets.includes(char)) {
+    // Case A: No opening bracket to match
+    if (stack.length === 0) {
+        return {
+            valid: false,
+            error: 'Unexpected closing bracket',
+            position: i
+        };
+    }
+
+    // Case B: Check if brackets match
+    const last = stack.pop();
+    if (last.bracket !== bracketPairs[char]) {
+        return {
+            valid: false,
+            error: 'Mismatched bracket types',
+            position: i
+        };
+    }
+}
+```
+
+**Explanation:**
+
+**Case A - Empty Stack:**
+If we encounter a closing bracket but the stack is empty, there's no opening bracket to match it.
+```
+Input: ")"
+Stack: []
+We see ')' but stack is empty → ERROR: Unexpected closing bracket
+```
+
+**Case B - Mismatched Brackets:**
+We pop the last opening bracket and check if it matches.
+```
+Input: "(]"
+Stack after '(': [{ bracket: '(', position: 0 }]
+We see ']': pop returns '('
+bracketPairs[']'] = '['
+'(' !== '[' → ERROR: Mismatched bracket types
+```
+
+**Case C - Successful Match (implicit):**
+If the brackets match, we simply continue. The `pop()` already removed the matched opening bracket.
+```
+Input: "()"
+Stack after '(': [{ bracket: '(', position: 0 }]
+We see ')': pop returns '('
+bracketPairs[')'] = '('
+'(' === '(' → Match! Continue...
+Stack is now: []
+```
+
+---
+
+#### Step 5: Ignore Non-Bracket Characters
+
+```javascript
+// Non-bracket characters are ignored (no else clause needed)
+```
+
+**Explanation:**
+If a character is neither an opening nor closing bracket, we simply don't do anything with it. The loop continues to the next character.
+
+```
+Input: "a(b)c"
+i=0, char='a': Not a bracket, skip
+i=1, char='(': Opening bracket, push to stack
+i=2, char='b': Not a bracket, skip
+i=3, char=')': Closing bracket, pop and match
+i=4, char='c': Not a bracket, skip
+Result: VALID
+```
+
+---
+
+#### Step 6: Check for Unclosed Brackets
+
+```javascript
+if (stack.length > 0) {
+    return {
+        valid: false,
+        error: 'Unmatched opening bracket',
+        position: stack[stack.length - 1].position
+    };
+}
+
+return { valid: true };
+```
+
+**Explanation:**
+After processing all characters, if the stack still has brackets in it, those brackets were never closed.
+
+```
+Input: "(("
+After processing: Stack = [{ bracket: '(', position: 0 },
+                          { bracket: '(', position: 1 }]
+Stack.length = 2 (not empty)
+→ ERROR: Unmatched opening bracket at position 1 (the last unclosed one)
+```
+
+**Why return the last bracket's position?**
+The last bracket in the stack is the most recently opened one that wasn't closed, which is usually the most helpful for debugging.
+
+---
+
+### Complete Code with Comments
 
 ```javascript
 function validateBrackets(input) {
-    const stack = [];
-    const openingBrackets = '([{';
-    const closingBrackets = ')]}';
-    const bracketPairs = {
+    // Data structures initialization
+    const stack = [];                    // Stores opening brackets
+    const openingBrackets = '([{';       // Quick lookup string
+    const closingBrackets = ')]}';       // Quick lookup string
+    const bracketPairs = {               // Maps closing → opening
         ')': '(',
         ']': '[',
         '}': '{'
     };
 
+    // Process each character in the input string
     for (let i = 0; i < input.length; i++) {
         const char = input[i];
 
         if (openingBrackets.includes(char)) {
-            // Push opening bracket with position
+            // OPENING BRACKET: Push to stack with position
             stack.push({ bracket: char, position: i });
-        } else if (closingBrackets.includes(char)) {
-            // Check for matching opening bracket
+        }
+        else if (closingBrackets.includes(char)) {
+            // CLOSING BRACKET: Must match last opening bracket
+
+            // Error Case 1: No opening bracket to match
             if (stack.length === 0) {
                 return {
                     valid: false,
@@ -132,7 +332,10 @@ function validateBrackets(input) {
                 };
             }
 
+            // Pop the last opening bracket
             const last = stack.pop();
+
+            // Error Case 2: Brackets don't match
             if (last.bracket !== bracketPairs[char]) {
                 return {
                     valid: false,
@@ -140,11 +343,12 @@ function validateBrackets(input) {
                     position: i
                 };
             }
+            // If we reach here, brackets matched successfully
         }
-        // Non-bracket characters are ignored
+        // NON-BRACKET: Ignored (no action needed)
     }
 
-    // Check for unclosed brackets
+    // Error Case 3: Unclosed opening brackets remain
     if (stack.length > 0) {
         return {
             valid: false,
@@ -153,24 +357,129 @@ function validateBrackets(input) {
         };
     }
 
+    // All brackets matched successfully
     return { valid: true };
 }
 ```
 
-### Key Points
+---
 
-1. **Stack-based approach**: Opening brackets are pushed, closing brackets pop and verify
-2. **Position tracking**: Each bracket stores its index for error reporting
-3. **Three error types**:
-   - `Unexpected closing bracket` - closing bracket with empty stack
-   - `Mismatched bracket types` - closing bracket doesn't match top of stack
-   - `Unmatched opening bracket` - brackets remain in stack after processing
-4. **Non-bracket handling**: Characters not in `([{)]}` are simply skipped
+### Visual Trace Example
 
-### Complexity
+Let's trace through the input `"{[()]}"`step by step:
 
-- **Time**: O(n) - single pass through input string
-- **Space**: O(n) - worst case stack size equals input length
+```
+Input: { [ ( ) ] }
+Index: 0 1 2 3 4 5
+
+Step 1: char = '{' (index 0)
+        Action: Push to stack
+        Stack: [{ bracket: '{', position: 0 }]
+
+Step 2: char = '[' (index 1)
+        Action: Push to stack
+        Stack: [{ bracket: '{', position: 0 },
+                { bracket: '[', position: 1 }]
+
+Step 3: char = '(' (index 2)
+        Action: Push to stack
+        Stack: [{ bracket: '{', position: 0 },
+                { bracket: '[', position: 1 },
+                { bracket: '(', position: 2 }]
+
+Step 4: char = ')' (index 3)
+        Action: Pop and compare
+        Popped: '('
+        bracketPairs[')'] = '('
+        '(' === '(' ✓ Match!
+        Stack: [{ bracket: '{', position: 0 },
+                { bracket: '[', position: 1 }]
+
+Step 5: char = ']' (index 4)
+        Action: Pop and compare
+        Popped: '['
+        bracketPairs[']'] = '['
+        '[' === '[' ✓ Match!
+        Stack: [{ bracket: '{', position: 0 }]
+
+Step 6: char = '}' (index 5)
+        Action: Pop and compare
+        Popped: '{'
+        bracketPairs['}'] = '{'
+        '{' === '{' ✓ Match!
+        Stack: []
+
+Final: Stack is empty → Return { valid: true }
+```
+
+---
+
+### Error Trace Example
+
+Let's trace through the invalid input `"([)]"`:
+
+```
+Input: ( [ ) ]
+Index: 0 1 2 3
+
+Step 1: char = '(' (index 0)
+        Action: Push to stack
+        Stack: [{ bracket: '(', position: 0 }]
+
+Step 2: char = '[' (index 1)
+        Action: Push to stack
+        Stack: [{ bracket: '(', position: 0 },
+                { bracket: '[', position: 1 }]
+
+Step 3: char = ')' (index 2)
+        Action: Pop and compare
+        Popped: '['
+        bracketPairs[')'] = '('
+        '[' !== '(' ✗ Mismatch!
+
+        Return: {
+            valid: false,
+            error: 'Mismatched bracket types',
+            position: 2
+        }
+```
+
+The algorithm correctly identifies that at position 2, we expected `]` to close `[`, but got `)` instead.
+
+---
+
+### Complexity Analysis
+
+#### Time Complexity: O(n)
+
+- We iterate through the input string exactly once
+- Each character is processed in constant time O(1):
+  - `includes()` on a 3-character string is O(1)
+  - `push()` and `pop()` on an array are O(1)
+  - Object property lookup is O(1)
+- Total: O(n) where n is the length of the input string
+
+#### Space Complexity: O(n)
+
+- **Worst case:** All characters are opening brackets
+  - Input: `"(((((((("`
+  - Stack grows to size n
+- **Best case:** No brackets or perfectly alternating
+  - Input: `"()()()"`
+  - Stack never exceeds size 1
+- **Average case:** O(n/2) which simplifies to O(n)
+
+---
+
+### Common Mistakes to Avoid
+
+1. **Forgetting to track position:** Without storing the position, you can't report WHERE the error occurred.
+
+2. **Using the wrong data structure:** Arrays, queues, or simple counters won't work because you need to match SPECIFIC bracket types, not just count them.
+
+3. **Not handling empty stack:** Always check if the stack is empty before calling `pop()`.
+
+4. **Returning too early:** Make sure to check for unclosed brackets AFTER processing all characters.
 
 ---
 
